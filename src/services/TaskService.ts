@@ -1,50 +1,50 @@
-import { Task } from "../models/Task";
+import { Task } from "../entities/Task";
 import { Priority } from "../types/types";
+import { TaskRepository } from "../repositories/TaskRepository";
 
 export class TaskService {
-	private tasks: Task[] = [];
+	private taskRepository: TaskRepository;
 
-	addTask(name: string, priority: Priority, category: string, dueDate: Date): Task {
+	constructor(taskRepository: TaskRepository) {
+		this.taskRepository = taskRepository;
+	}
+
+	async addTask(name: string, priority: Priority, category: string, dueDate: Date): Promise<Task> {
 		const task = new Task(name, priority, category, dueDate);
-		this.tasks.push(task);
-		return task;
+		return await this.taskRepository.create(task);
 	}
 
-	getAllTasks(): Task[] {
-		return this.tasks;
+	async getAllTasks(): Promise<Task[]> {
+		return await this.taskRepository.findAll();
 	}
 
-	markTaskAsComplete(taskId: string): boolean {
-		const task = this.tasks.find((t) => t.id === taskId);
+	async markTaskAsComplete(taskId: string): Promise<boolean> {
+		const task = await this.taskRepository.findById(taskId);
 		if (task) {
 			task.isCompleted = true;
+			await this.taskRepository.update(task);
 			return true;
 		}
 		return false;
 	}
 
-	removeTask(taskId: string): boolean {
-		const initialLength = this.tasks.length;
-		this.tasks = this.tasks.filter((t) => t.id !== taskId);
-		return this.tasks.length !== initialLength;
+	async removeTask(taskId: string): Promise<boolean> {
+		return await this.taskRepository.delete(taskId);
 	}
 
-	getTasksByPriority(priority: Priority): Task[] {
-		return this.tasks.filter((task) => task.priority === priority);
+	async getTasksByPriority(priority: Priority): Promise<Task[]> {
+		return await this.taskRepository.findByPriority(priority);
 	}
 
-	getTasksByCategory(category: string): Task[] {
-		return this.tasks.filter((task) => task.category.toLowerCase() === category.toLowerCase());
+	async getTasksByCategory(category: string): Promise<Task[]> {
+		return await this.taskRepository.findByCategory(category);
 	}
 
-	getTasksSortedByDueDate(ascending: boolean = true): Task[] {
-		return [...this.tasks].sort((a, b) => {
-			const comparison = a.dueDate.getTime() - b.dueDate.getTime();
-			return ascending ? comparison : -comparison;
-		});
+	async getTasksSortedByDueDate(ascending: boolean = true): Promise<Task[]> {
+		return await this.taskRepository.findAllSortedByDueDate(ascending);
 	}
 
-	getUniqueCategories(): string[] {
-		return [...new Set(this.tasks.map((task) => task.category))];
+	async getUniqueCategories(): Promise<string[]> {
+		return await this.taskRepository.getUniqueCategories();
 	}
 }

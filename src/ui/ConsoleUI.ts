@@ -27,17 +27,21 @@ export class ConsoleUI {
 		const category = await this.question("Enter category: ");
 		const dueDateStr = await this.question("Enter due date (YYYY-MM-DD): ");
 
-		const task = this.taskService.addTask(name, priority as Priority, category, new Date(dueDateStr));
-
-		console.log("Task added successfully!");
+		try {
+			await this.taskService.addTask(name, priority as Priority, category, new Date(dueDateStr));
+			console.log("Task added successfully!");
+		} catch (error) {
+			console.error("Error adding task:", error);
+		}
 		this.showMainMenu();
 	}
 
-	displayTasks(): void {
-		const tasks = this.taskService.getAllTasks();
-		console.log("\nAll Tasks:");
-		tasks.forEach((task) => {
-			console.log(`
+	async displayTasks(): Promise<void> {
+		try {
+			const tasks = await this.taskService.getAllTasks();
+			console.log("\nAll Tasks:");
+			tasks.forEach((task) => {
+				console.log(`
 ID: ${task.id}
 Name: ${task.name}
 Priority: ${task.priority}
@@ -45,13 +49,16 @@ Category: ${task.category}
 Due Date: ${task.dueDate.toLocaleDateString()}
 Status: ${task.isCompleted ? "Completed" : "Pending"}
 -------------------`);
-		});
+			});
+		} catch (error) {
+			console.error("Error displaying tasks:", error);
+		}
 		this.showMainMenu();
 	}
 
 	async markTaskComplete(): Promise<void> {
 		const taskId = await this.question("Enter task ID to mark as complete: ");
-		const success = this.taskService.markTaskAsComplete(taskId);
+		const success = await this.taskService.markTaskAsComplete(taskId);
 
 		if (success) {
 			console.log("Task marked as complete!");
@@ -63,7 +70,7 @@ Status: ${task.isCompleted ? "Completed" : "Pending"}
 
 	async removeTask(): Promise<void> {
 		const taskId = await this.question("Enter task ID to remove: ");
-		const success = this.taskService.removeTask(taskId);
+		const success = await this.taskService.removeTask(taskId);
 
 		if (success) {
 			console.log("Task removed successfully!");
@@ -117,13 +124,13 @@ Status: ${task.isCompleted ? "Completed" : "Pending"}
 				return;
 		}
 
-		const tasks = this.taskService.getTasksByPriority(priority);
+		const tasks = await this.taskService.getTasksByPriority(priority);
 		await this.displayFilteredTasks(tasks);
 		this.showMainMenu();
 	}
 
 	async filterByCategory(): Promise<void> {
-		const categories = this.taskService.getUniqueCategories();
+		const categories = await this.taskService.getUniqueCategories();
 
 		if (categories.length === 0) {
 			console.log("\nNo categories found!");
@@ -140,7 +147,7 @@ Status: ${task.isCompleted ? "Completed" : "Pending"}
 		const selectedIndex = parseInt(choice) - 1;
 
 		if (selectedIndex >= 0 && selectedIndex < categories.length) {
-			const tasks = this.taskService.getTasksByCategory(categories[selectedIndex]);
+			const tasks = await this.taskService.getTasksByCategory(categories[selectedIndex]);
 			await this.displayFilteredTasks(tasks);
 		} else {
 			console.log("Invalid choice!");
@@ -156,7 +163,7 @@ Status: ${task.isCompleted ? "Completed" : "Pending"}
 		const choice = await this.question("Enter your choice (1-2): ");
 		const ascending = choice === "1";
 
-		const tasks = this.taskService.getTasksSortedByDueDate(ascending);
+		const tasks = await this.taskService.getTasksSortedByDueDate(ascending);
 		await this.displayFilteredTasks(tasks);
 		this.showMainMenu();
 	}
