@@ -1,14 +1,16 @@
 {
 	"compilerOptions": {
-		"target": "es2020", // Latest ECMAScript features supported by Node.js
-		"module": "commonjs", // CommonJS modules for Node.js
-		"rootDir": "src", // Source files location
-		"outDir": "dist", // Compiled JavaScript output location
-		"strict": true, // Enables strict type-checking
-		"esModuleInterop": true, // Better compatibility with ES6 modules
+		"target": "es2018",
+		"module": "commonjs",
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
-		"skipLibCheck": true // Speeds up compilation by skipping library checks
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true
 	},
-	"include": ["src"], // Include all files in src directory
-	"exclude": ["node_modules", "dist"] // Exclude node_modules and compiled files
+	"include": ["src/**/*"],
+	"exclude": ["node_modules"]
 }
