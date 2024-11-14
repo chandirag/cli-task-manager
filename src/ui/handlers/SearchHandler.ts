@@ -3,12 +3,14 @@ import { BaseUI } from "../base/BaseUI";
 import { TaskService } from "../../services/TaskService";
 import { TableComponent } from "../components/TableComponent";
 import { clearScreen } from "../../utils/console";
+import Fuse from "fuse.js";
 
 /**
  * Handles real-time search functionality across tasks.
  */
 export class SearchHandler extends BaseUI {
 	private tableComponent: TableComponent;
+	private fuse!: Fuse<Task>;
 
 	/**
 	 * Creates an instance of SearchHandler.
@@ -17,6 +19,38 @@ export class SearchHandler extends BaseUI {
 	constructor(taskService: TaskService) {
 		super(taskService);
 		this.tableComponent = new TableComponent();
+	}
+
+	/**
+	 * Initializes the Fuse instance with the current tasks.
+	 * @param tasks - Array of tasks to initialize fuzzy search with
+	 */
+	private initializeFuseSearch(tasks: Task[]): void {
+		const options = {
+			keys: [
+				{ name: "name", weight: 2 },
+				{ name: "category", weight: 1 },
+				{ name: "priority", weight: 1 },
+			],
+			includeScore: true,
+			threshold: 0.4,
+			ignoreLocation: true,
+			minMatchCharLength: 2,
+		};
+		this.fuse = new Fuse(tasks, options);
+	}
+
+	/**
+	 * Filters tasks based on the search term using fuzzy search.
+	 * @param searchTerm - The term to search for
+	 * @param tasks - The tasks to search through (used as fallback)
+	 * @returns Filtered array of tasks matching the search term
+	 */
+	private filterTasks(searchTerm: string, tasks: Task[]): Task[] {
+		if (!searchTerm) return tasks;
+
+		const results = this.fuse.search(searchTerm);
+		return results.map((result) => result.item);
 	}
 
 	/**
@@ -31,9 +65,12 @@ export class SearchHandler extends BaseUI {
 				return;
 			}
 
+			this.initializeFuseSearch(allTasks);
+
 			clearScreen();
 			console.log("\nSearch Tasks (press Ctrl+C to return to main menu)");
-			console.log("Type to search across task name, category, or status...\n");
+			console.log("Type to search across task name, category, priority, or status...\n");
+			console.log("Fuzzy search enabled - try approximate matches!\n");
 
 			this.tableComponent.formatTasksToTable(allTasks);
 
@@ -103,27 +140,12 @@ export class SearchHandler extends BaseUI {
 		if (filteredTasks.length > 0) {
 			this.tableComponent.formatTasksToTable(filteredTasks);
 			console.log(`\nFound ${filteredTasks.length} matching tasks out of ${allTasks.length} total tasks`);
+			if (searchTerm) {
+				console.log("(Using fuzzy search - results include approximate matches)");
+			}
 		} else {
 			console.log("No matching tasks found.");
 		}
-	}
-
-	/**
-	 * Filters tasks based on the search term.
-	 * Searches across task name, category, and completion status.
-	 * @param searchTerm - The term to search for
-	 * @param tasks - The tasks to search through
-	 * @returns Filtered array of tasks matching the search term
-	 */
-	private filterTasks(searchTerm: string, tasks: Task[]): Task[] {
-		const searchTermLower = searchTerm.toLowerCase();
-		return tasks.filter(
-			(task) =>
-				task.name.toLowerCase().includes(searchTermLower) ||
-				task.category.toLowerCase().includes(searchTermLower) ||
-				(task.isCompleted ? "completed" : "pending").includes(searchTermLower) ||
-				task.priority.toLowerCase().includes(searchTermLower)
-		);
 	}
 
 	/**
