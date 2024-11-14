@@ -1,4 +1,4 @@
-import { Repository } from "typeorm";
+import { Repository, Between } from "typeorm";
 import { Task } from "../entities/Task";
 import { AppDataSource } from "../config/database";
 import { Priority } from "../types/types";
@@ -102,5 +102,31 @@ export class TaskRepository {
 			.select("DISTINCT task.category", "category")
 			.getRawMany();
 		return result.map((item) => item.category);
+	}
+
+	/**
+	 * Retrieves tasks by completion status.
+	 * @param isCompleted - Whether to find completed or pending tasks
+	 * @returns A promise that resolves to an array of tasks with the specified completion status
+	 */
+	async findByCompletion(isCompleted: boolean): Promise<Task[]> {
+		return await this.repository.findBy({ isCompleted });
+	}
+
+	/**
+	 * Retrieves tasks within a due date range.
+	 * @param startDate - The start date of the range (inclusive)
+	 * @param endDate - The end date of the range (exclusive)
+	 * @returns A promise that resolves to an array of tasks due within the specified range
+	 */
+	async findByDueDateRange(startDate: Date, endDate: Date): Promise<Task[]> {
+		return await this.repository.find({
+			where: {
+				dueDate: Between(startDate, endDate),
+			},
+			order: {
+				dueDate: "ASC",
+			},
+		});
 	}
 }

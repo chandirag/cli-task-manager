@@ -119,4 +119,23 @@ export class TaskService {
 	async getTaskById(taskId: string): Promise<Task | null> {
 		return await this.taskRepository.findById(taskId);
 	}
+
+	/**
+	 * Retrieves tasks by completion status.
+	 * @param isCompleted - Whether to get completed or pending tasks
+	 * @returns A promise that resolves to an array of tasks with the specified completion status
+	 */
+	async getTasksByCompletion(isCompleted: boolean): Promise<Task[]> {
+		return await this.taskRepository.findByCompletion(isCompleted);
+	}
+
+	/**
+	 * Retrieves tasks within a due date range.
+	 * @param startDate - The start date of the range (inclusive)
+	 * @param endDate - The end date of the range (exclusive)
+	 * @returns A promise that resolves to an array of tasks due within the specified range
+	 */
+	async getTasksByDueDateRange(startDate: Date, endDate: Date): Promise<Task[]> {
+		return await this.taskRepository.findByDueDateRange(startDate, endDate);
+	}
 }
