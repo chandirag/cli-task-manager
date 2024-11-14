@@ -4,6 +4,7 @@ import { Priority } from "../../types/types";
 import { TableComponent } from "../components/TableComponent";
 import { Task } from "../../entities/Task";
 import { input, select, confirm } from "@inquirer/prompts";
+import search from "@inquirer/search";
 import { clearScreen } from "../../utils/console";
 
 /**
@@ -29,7 +30,7 @@ export class TaskHandler extends BaseUI {
 		try {
 			const name = await input({
 				message: "Enter task name:",
-				validate: (input) => input.trim().length > 0 || "Task name cannot be empty",
+				validate: (input: string) => input.trim().length > 0 || "Task name cannot be empty",
 			});
 
 			const priority = await select({
@@ -37,21 +38,44 @@ export class TaskHandler extends BaseUI {
 				choices: Object.values(Priority).map((p) => ({ name: p, value: p })),
 			});
 
-			const category = await input({
-				message: "Enter category:",
-				validate: (input) => input.trim().length > 0 || "Category cannot be empty",
+			const existingCategories = await this.taskService.getUniqueCategories();
+
+			const category = await search<string>({
+				message: "Enter category (type to search or enter new):",
+				validate: (value: unknown) => {
+					if (typeof value !== "string") return "Category must be a string";
+					return value.trim().length > 0 || "Category cannot be empty";
+				},
+				source: (term: string | undefined, { signal }) => {
+					if (!term) return existingCategories;
+
+					const termLower = term.toLowerCase();
+					const matches = existingCategories.filter((cat) => cat.toLowerCase().includes(termLower));
+
+					// If the exact term doesn't exist, add it as a new option
+					if (!matches.some((cat) => cat.toLowerCase() === termLower) && term.trim()) {
+						return [...matches, `📝 Create new category: ${term}`];
+					}
+
+					return matches;
+				},
 			});
+
+			// Remove the prefix if this was a new category
+			const finalCategory = category.startsWith("📝 Create new category: ")
+				? category.replace("📝 Create new category: ", "")
+				: category;
 
 			const dueDate = await input({
 				message: "Enter due date (YYYY-MM-DD):",
 				validate: this.validateDueDate,
 			});
 
-			await this.taskService.addTask(name, priority, category, new Date(dueDate));
+			await this.taskService.addTask(name, priority, finalCategory, new Date(dueDate));
+
 			clearScreen();
 			console.log("✅ Task added successfully!\n");
 
-			// Show updated table
 			const tasks = await this.taskService.getAllTasks();
 			this.tableComponent.formatTasksToTable(tasks);
 		} catch (error) {
@@ -112,7 +136,6 @@ export class TaskHandler extends BaseUI {
 			clearScreen();
 			console.log("✅ Task updated successfully!\n");
 
-			// Show updated table
 			const updatedTasks = await this.taskService.getAllTasks();
 			this.tableComponent.formatTasksToTable(updatedTasks);
 		} catch (error) {
@@ -164,7 +187,6 @@ export class TaskHandler extends BaseUI {
 			if (success) {
 				console.log("✅ Task removed successfully!\n");
 
-				// Show updated table
 				const remainingTasks = await this.taskService.getAllTasks();
 				if (remainingTasks.length > 0) {
 					this.tableComponent.formatTasksToTable(remainingTasks);
@@ -207,12 +229,34 @@ export class TaskHandler extends BaseUI {
 				return { priority };
 
 			case "category":
-				const category = await input({
-					message: "Enter new category:",
-					default: task.category,
-					validate: (input) => input.trim().length > 0 || "Category cannot be empty",
+				const existingCategories = await this.taskService.getUniqueCategories();
+				const category = await search<string>({
+					message: "Enter new category (type to search or enter new):",
+					validate: (value: unknown) => {
+						if (typeof value !== "string") return "Category must be a string";
+						return value.trim().length > 0 || "Category cannot be empty";
+					},
+					source: (term: string | undefined, { signal }) => {
+						if (!term) return existingCategories;
+
+						const termLower = term.toLowerCase();
+						const matches = existingCategories.filter((cat) => cat.toLowerCase().includes(termLower));
+
+						// If the exact term doesn't exist, add it as a new option
+						if (!matches.some((cat) => cat.toLowerCase() === termLower) && term.trim()) {
+							return [...matches, `📝 Create new category: ${term}`];
+						}
+
+						return matches;
+					},
 				});
-				return { category };
+
+				// Remove the prefix if this was a new category
+				const finalCategory = category.startsWith("📝 Create new category: ")
+					? category.replace("📝 Create new category: ", "")
+					: category;
+
+				return { category: finalCategory };
 
 			case "dueDate":
 				const dueDate = await input({
