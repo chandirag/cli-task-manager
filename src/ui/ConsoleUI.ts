@@ -1,7 +1,8 @@
 import * as readline from "readline";
 import { TaskService } from "../services/TaskService";
 import { Priority } from "../types/types";
-import { Task } from "../models/Task";
+import { Task } from "../entities/Task";
+import Table from "cli-table";
 
 export class ConsoleUI {
 	private rl: readline.Interface;
@@ -36,20 +37,44 @@ export class ConsoleUI {
 		this.showMainMenu();
 	}
 
+	private createTaskTable(): Table {
+		return new Table({
+			head: ["#", "ID", "Name", "Priority", "Category", "Due Date", "Status"],
+			colWidths: [4, 38, 20, 10, 15, 12, 10],
+			style: {
+				head: ["cyan"],
+				border: ["grey"],
+			},
+		});
+	}
+
+	private formatTasksToTable(tasks: Task[]): void {
+		const table = this.createTaskTable();
+
+		tasks.forEach((task, index) => {
+			table.push([
+				(index + 1).toString(),
+				task.id,
+				task.name,
+				task.priority,
+				task.category,
+				task.dueDate.toLocaleDateString(),
+				task.isCompleted ? "Completed" : "Pending",
+			]);
+		});
+
+		console.log(table.toString());
+	}
+
 	async displayTasks(): Promise<void> {
 		try {
 			const tasks = await this.taskService.getAllTasks();
 			console.log("\nAll Tasks:");
-			tasks.forEach((task) => {
-				console.log(`
-ID: ${task.id}
-Name: ${task.name}
-Priority: ${task.priority}
-Category: ${task.category}
-Due Date: ${task.dueDate.toLocaleDateString()}
-Status: ${task.isCompleted ? "Completed" : "Pending"}
--------------------`);
-			});
+			if (tasks.length === 0) {
+				console.log("No tasks found!");
+			} else {
+				this.formatTasksToTable(tasks);
+			}
 		} catch (error) {
 			console.error("Error displaying tasks:", error);
 		}
@@ -86,17 +111,7 @@ Status: ${task.isCompleted ? "Completed" : "Pending"}
 			return;
 		}
 
-		console.log("\nTasks:");
-		tasks.forEach((task) => {
-			console.log(`
-ID: ${task.id}
-Name: ${task.name}
-Priority: ${task.priority}
-Category: ${task.category}
-Due Date: ${task.dueDate.toLocaleDateString()}
-Status: ${task.isCompleted ? "Completed" : "Pending"}
--------------------`);
-		});
+		this.formatTasksToTable(tasks);
 	}
 
 	async filterByPriority(): Promise<void> {
