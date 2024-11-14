@@ -1,16 +1,18 @@
-import * as readline from "readline";
+import inquirer from "inquirer";
 import { TaskService } from "../services/TaskService";
-import { Priority } from "../types/types";
+import { Priority, IPromptOption, IMenuItem } from "../types/types";
 import { Task } from "../entities/Task";
 import Table from "cli-table";
+import { clearScreen } from "../utils/console";
 
 /**
  * Class representing the console user interface for the task manager.
  */
 export class ConsoleUI {
-	private rl: readline.Interface;
 	private taskService: TaskService;
-	private static MAX_RETRIES = 3;
+	private readonly mainMenuItems: IMenuItem[];
+	private readonly viewMenuItems: IMenuItem[];
+	private lastDisplayedTasks: Task[] | null = null;
 
 	/**
 	 * Creates an instance of ConsoleUI.
@@ -18,235 +20,29 @@ export class ConsoleUI {
 	 */
 	constructor(taskService: TaskService) {
 		this.taskService = taskService;
-		this.rl = readline.createInterface({
-			input: process.stdin,
-			output: process.stdout,
-		});
-	}
 
-	/**
-	 * Prompts the user with a question and returns their input.
-	 * @param query - The question to ask the user.
-	 * @returns A promise that resolves to the user's input.
-	 */
-	private async question(query: string): Promise<string> {
-		return new Promise((resolve) => {
-			this.rl.question(query, resolve);
-		});
-	}
+		// Update main menu items to separate view all from filter/sort
+		this.mainMenuItems = [
+			{ name: "Add Task", value: "add", handler: this.addTask.bind(this) },
+			{ name: "View All Tasks", value: "viewAll", handler: this.displayTasks.bind(this) },
+			{ name: "Filter/Sort Tasks", value: "filter", handler: this.showViewOptions.bind(this) },
+			{ name: "Mark Task as Complete", value: "complete", handler: this.markTaskComplete.bind(this) },
+			{ name: "Remove Task", value: "remove", handler: this.removeTask.bind(this) },
+			{ name: "Exit", value: "exit", handler: this.exit.bind(this) },
+		];
 
-	/**
-	 * Prompts the user with a question and validates the input with retries.
-	 * @param query - The question to ask the user.
-	 * @param validator - The function to validate the user's input.
-	 * @param currentRetry - The current retry attempt.
-	 * @returns A promise that resolves to the valid input or null if max retries are exceeded.
-	 */
-	private async questionWithRetries(
-		query: string,
-		validator: (input: string) => { isValid: boolean; message?: string },
-		currentRetry: number = 1
-	): Promise<string | null> {
-		const answer = await this.question(query);
-		const validation = validator(answer);
-
-		if (validation.isValid) {
-			return answer;
-		}
-
-		if (currentRetry >= ConsoleUI.MAX_RETRIES) {
-			console.log("\nToo many invalid attempts. Returning to main menu.");
-			return null;
-		}
-
-		console.log(validation.message || "Invalid input. Please try again.");
-		return this.questionWithRetries(query, validator, currentRetry + 1);
-	}
-
-	/**
-	 * Validates the priority input.
-	 * @param input - The user's input.
-	 * @returns An object indicating if the input is valid and an optional message.
-	 */
-	private validatePriority(input: string): { isValid: boolean; message?: string } {
-		const normalizedInput = input.toLowerCase();
-		const validInputs = {
-			low: Priority.LOW,
-			l: Priority.LOW,
-			medium: Priority.MEDIUM,
-			m: Priority.MEDIUM,
-			high: Priority.HIGH,
-			h: Priority.HIGH,
-		};
-
-		if (normalizedInput in validInputs) {
-			return { isValid: true };
-		}
-
-		return {
-			isValid: false,
-			message: "Please enter a valid priority (Low/L, Medium/M, High/H)",
-		};
-	}
-
-	/**
-	 * Validates the due date input.
-	 * @param input - The user's input.
-	 * @returns An object indicating if the input is valid and an optional message.
-	 */
-	private validateDueDate(input: string): { isValid: boolean; message?: string } {
-		// Check format
-		if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) {
-			return {
-				isValid: false,
-				message: "Please enter the date in YYYY-MM-DD format",
-			};
-		}
-
-		const inputDate = new Date(input);
-
-		// Check if date is valid
-		if (isNaN(inputDate.getTime())) {
-			return {
-				isValid: false,
-				message: "Please enter a valid date",
-			};
-		}
-
-		// Remove time component for comparison
-		const today = new Date();
-		const todayWithoutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-		const inputWithoutTime = new Date(inputDate.getFullYear(), inputDate.getMonth(), inputDate.getDate());
-
-		// Check if date is in the past
-		if (inputWithoutTime < todayWithoutTime) {
-			return {
-				isValid: false,
-				message: "Due date cannot be in the past",
-			};
-		}
-
-		// Validate month and day
-		const [year, month, day] = input.split("-").map(Number);
-		const monthDays = new Date(year, month, 0).getDate();
-
-		if (month < 1 || month > 12) {
-			return {
-				isValid: false,
-				message: "Month must be between 1 and 12",
-			};
-		}
-
-		if (day < 1 || day > monthDays) {
-			return {
-				isValid: false,
-				message: `Day must be between 1 and ${monthDays} for the selected month`,
-			};
-		}
-
-		return { isValid: true };
-	}
-
-	/**
-	 * Validates the task name input.
-	 * @param input - The user's input.
-	 * @returns An object indicating if the input is valid and an optional message.
-	 */
-	private validateTaskName(input: string): { isValid: boolean; message?: string } {
-		if (input.trim().length === 0) {
-			return {
-				isValid: false,
-				message: "Task name cannot be empty",
-			};
-		}
-		return { isValid: true };
-	}
-
-	/**
-	 * Validates the category input.
-	 * @param input - The user's input.
-	 * @returns An object indicating if the input is valid and an optional message.
-	 */
-	private validateCategory(input: string): { isValid: boolean; message?: string } {
-		if (input.trim().length === 0) {
-			return {
-				isValid: false,
-				message: "Category cannot be empty",
-			};
-		}
-		return { isValid: true };
-	}
-
-	/**
-	 * Converts user input to a Priority enum.
-	 * @param input - The user's input.
-	 * @returns The corresponding Priority enum.
-	 */
-	private getPriorityFromInput(input: string): Priority {
-		const normalizedInput = input.toLowerCase();
-		switch (normalizedInput) {
-			case "l":
-			case "low":
-				return Priority.LOW;
-			case "m":
-			case "medium":
-				return Priority.MEDIUM;
-			case "h":
-			case "high":
-				return Priority.HIGH;
-			default:
-				throw new Error("Invalid priority");
-		}
-	}
-
-	/**
-	 * Prompts the user to add a new task with validation.
-	 */
-	async addTask(): Promise<void> {
-		// Get task name
-		const name = await this.questionWithRetries("Enter task name: ", this.validateTaskName);
-		if (!name) {
-			this.showMainMenu();
-			return;
-		}
-
-		// Get priority
-		const priorityInput = await this.questionWithRetries(
-			"Enter priority (Low/L, Medium/M, High/H): ",
-			this.validatePriority
-		);
-		if (!priorityInput) {
-			this.showMainMenu();
-			return;
-		}
-
-		// Get category
-		const category = await this.questionWithRetries("Enter category: ", this.validateCategory);
-		if (!category) {
-			this.showMainMenu();
-			return;
-		}
-
-		// Get due date
-		const dueDateStr = await this.questionWithRetries("Enter due date (YYYY-MM-DD): ", this.validateDueDate);
-		if (!dueDateStr) {
-			this.showMainMenu();
-			return;
-		}
-
-		try {
-			const priority = this.getPriorityFromInput(priorityInput);
-			await this.taskService.addTask(name, priority, category, new Date(dueDateStr));
-			console.log("Task added successfully!");
-		} catch (error) {
-			console.error("Error adding task:", error);
-		}
-		this.showMainMenu();
+		// Update view menu items to remove view all
+		this.viewMenuItems = [
+			{ name: "View All Tasks", value: "all", handler: this.displayTasks.bind(this) },
+			{ name: "Filter by Priority", value: "priority", handler: this.filterByPriority.bind(this) },
+			{ name: "Filter by Category", value: "category", handler: this.filterByCategory.bind(this) },
+			{ name: "Sort by Due Date", value: "date", handler: this.sortByDueDate.bind(this) },
+			{ name: "Back to Main Menu", value: "back", handler: this.showMainMenu.bind(this) },
+		];
 	}
 
 	/**
 	 * Creates a table for displaying tasks.
-	 * @returns A new Table instance.
 	 */
 	private createTaskTable(): Table {
 		return new Table({
@@ -260,12 +56,10 @@ export class ConsoleUI {
 	}
 
 	/**
-	 * Formats tasks into a table and displays it.
-	 * @param tasks - The list of tasks to display.
+	 * Displays tasks in a table format.
 	 */
 	private formatTasksToTable(tasks: Task[]): void {
 		const table = this.createTaskTable();
-
 		tasks.forEach((task, index) => {
 			table.push([
 				(index + 1).toString(),
@@ -277,217 +71,338 @@ export class ConsoleUI {
 				task.isCompleted ? "Completed" : "Pending",
 			]);
 		});
-
 		console.log(table.toString());
 	}
 
 	/**
-	 * Displays all tasks in a table format.
+	 * Displays the current task table and menu.
+	 * @param tasks - Optional tasks to display
+	 * @param menuTitle - Optional menu title
+	 * @param menuItems - Optional menu items to display
+	 * @param filterMessage - Optional message to display above the table
 	 */
-	async displayTasks(): Promise<void> {
-		try {
-			const tasks = await this.taskService.getAllTasks();
-			console.log("\nAll Tasks:");
-			if (tasks.length === 0) {
-				console.log("No tasks found!");
-			} else {
-				this.formatTasksToTable(tasks);
+	private async displayTableAndMenu(
+		tasks: Task[] | null | undefined = undefined,
+		menuTitle: string = "Task Manager",
+		menuItems: IMenuItem[] = this.mainMenuItems,
+		filterMessage?: string
+	): Promise<void> {
+		clearScreen();
+
+		// Display table if there are tasks to show
+		if (tasks) {
+			this.lastDisplayedTasks = tasks;
+		}
+
+		// Display filter message if provided
+		if (filterMessage) {
+			console.log(`\n${filterMessage}`);
+		}
+
+		// Always show table header even if no tasks
+		console.log("\nTasks:");
+		if ((tasks && tasks.length > 0) || (this.lastDisplayedTasks && this.lastDisplayedTasks.length > 0)) {
+			const tasksToDisplay = tasks || this.lastDisplayedTasks;
+			if (tasksToDisplay) {
+				this.formatTasksToTable(tasksToDisplay);
 			}
+		} else {
+			const emptyTable = this.createTaskTable();
+			console.log(emptyTable.toString());
+		}
+		console.log(); // Add spacing between table and menu
+
+		// Display menu
+		const { action } = await inquirer.prompt([
+			{
+				type: "list",
+				name: "action",
+				message: menuTitle,
+				choices: menuItems.map((item) => ({
+					name: item.name,
+					value: item.value,
+				})),
+			},
+		]);
+
+		const menuItem = menuItems.find((item) => item.value === action);
+		if (menuItem) {
+			await menuItem.handler();
+		}
+	}
+
+	/**
+	 * Adds a new task through interactive prompts.
+	 */
+	private async addTask(): Promise<void> {
+		try {
+			const answers = await inquirer.prompt([
+				{
+					type: "input",
+					name: "name",
+					message: "Enter task name:",
+					validate: (input) => input.trim().length > 0 || "Task name cannot be empty",
+				},
+				{
+					type: "list",
+					name: "priority",
+					message: "Select priority:",
+					choices: Object.values(Priority).map((p) => ({ name: p, value: p })),
+				},
+				{
+					type: "input",
+					name: "category",
+					message: "Enter category:",
+					validate: (input) => input.trim().length > 0 || "Category cannot be empty",
+				},
+				{
+					type: "input",
+					name: "dueDate",
+					message: "Enter due date (YYYY-MM-DD):",
+					validate: this.validateDueDate,
+				},
+			]);
+
+			await this.taskService.addTask(answers.name, answers.priority, answers.category, new Date(answers.dueDate));
+			console.log("Task added successfully!");
+			await this.displayTableAndMenu(await this.taskService.getAllTasks());
 		} catch (error) {
-			console.error("Error displaying tasks:", error);
+			console.error("Error adding task:", error);
+			await this.showMainMenu();
 		}
-		this.showMainMenu();
 	}
 
 	/**
-	 * Marks a task as complete based on user input.
+	 * Validates the due date input.
 	 */
-	async markTaskComplete(): Promise<void> {
-		const taskId = await this.question("Enter task ID to mark as complete: ");
-		const success = await this.taskService.markTaskAsComplete(taskId);
-
-		if (success) {
-			console.log("Task marked as complete!");
-		} else {
-			console.log("Task not found!");
-		}
-		this.showMainMenu();
-	}
-
-	/**
-	 * Removes a task based on user input.
-	 */
-	async removeTask(): Promise<void> {
-		const taskId = await this.question("Enter task ID to remove: ");
-		const success = await this.taskService.removeTask(taskId);
-
-		if (success) {
-			console.log("Task removed successfully!");
-		} else {
-			console.log("Task not found!");
-		}
-		this.showMainMenu();
-	}
-
-	/**
-	 * Displays filtered tasks in a table format.
-	 * @param tasks - The list of tasks to display.
-	 */
-	private async displayFilteredTasks(tasks: Task[]): Promise<void> {
-		if (tasks.length === 0) {
-			console.log("\nNo tasks found!");
-			return;
+	private validateDueDate(input: string): boolean | string {
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+			return "Please enter the date in YYYY-MM-DD format";
 		}
 
-		this.formatTasksToTable(tasks);
-	}
-
-	/**
-	 * Filters tasks by priority based on user input.
-	 */
-	async filterByPriority(): Promise<void> {
-		console.log("\nSelect Priority:");
-		console.log(`1. ${Priority.LOW}`);
-		console.log(`2. ${Priority.MEDIUM}`);
-		console.log(`3. ${Priority.HIGH}`);
-
-		const choice = await this.question("Enter your choice (1-3): ");
-		let priority: Priority;
-
-		switch (choice) {
-			case "1":
-				priority = Priority.LOW;
-				break;
-			case "2":
-				priority = Priority.MEDIUM;
-				break;
-			case "3":
-				priority = Priority.HIGH;
-				break;
-			default:
-				console.log("Invalid choice!");
-				this.showMainMenu();
-				return;
+		const inputDate = new Date(input);
+		if (isNaN(inputDate.getTime())) {
+			return "Please enter a valid date";
 		}
 
-		const tasks = await this.taskService.getTasksByPriority(priority);
-		await this.displayFilteredTasks(tasks);
-		this.showMainMenu();
-	}
-
-	/**
-	 * Filters tasks by category based on user input.
-	 */
-	async filterByCategory(): Promise<void> {
-		const categories = await this.taskService.getUniqueCategories();
-
-		if (categories.length === 0) {
-			console.log("\nNo categories found!");
-			this.showMainMenu();
-			return;
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		if (inputDate < today) {
+			return "Due date cannot be in the past";
 		}
 
-		console.log("\nAvailable Categories:");
-		categories.forEach((category, index) => {
-			console.log(`${index + 1}. ${category}`);
-		});
+		const [year, month, day] = input.split("-").map(Number);
+		const monthDays = new Date(year, month, 0).getDate();
 
-		const choice = await this.question(`Enter your choice (1-${categories.length}): `);
-		const selectedIndex = parseInt(choice) - 1;
-
-		if (selectedIndex >= 0 && selectedIndex < categories.length) {
-			const tasks = await this.taskService.getTasksByCategory(categories[selectedIndex]);
-			await this.displayFilteredTasks(tasks);
-		} else {
-			console.log("Invalid choice!");
+		if (month < 1 || month > 12) {
+			return "Month must be between 1 and 12";
 		}
-		this.showMainMenu();
-	}
 
-	/**
-	 * Sorts tasks by due date based on user input.
-	 */
-	async sortByDueDate(): Promise<void> {
-		console.log("\nSort Order:");
-		console.log("1. Ascending (Earlier → Later)");
-		console.log("2. Descending (Later → Earlier)");
-
-		const choice = await this.question("Enter your choice (1-2): ");
-		const ascending = choice === "1";
-
-		const tasks = await this.taskService.getTasksSortedByDueDate(ascending);
-		await this.displayFilteredTasks(tasks);
-		this.showMainMenu();
-	}
-
-	/**
-	 * Displays the view options menu.
-	 */
-	async showViewOptions(): Promise<void> {
-		console.log("\n=== View Options ===");
-		console.log("1. View All Tasks");
-		console.log("2. Filter by Priority");
-		console.log("3. Filter by Category");
-		console.log("4. Sort by Due Date");
-		console.log("5. Back to Main Menu");
-
-		const choice = await this.question("Enter your choice (1-5): ");
-
-		switch (choice) {
-			case "1":
-				this.displayTasks();
-				break;
-			case "2":
-				await this.filterByPriority();
-				break;
-			case "3":
-				await this.filterByCategory();
-				break;
-			case "4":
-				await this.sortByDueDate();
-				break;
-			case "5":
-				this.showMainMenu();
-				break;
-			default:
-				console.log("Invalid choice!");
-				this.showViewOptions();
+		if (day < 1 || day > monthDays) {
+			return `Day must be between 1 and ${monthDays} for the selected month`;
 		}
+
+		return true;
 	}
 
 	/**
 	 * Displays the main menu and handles user input.
 	 */
 	async showMainMenu(): Promise<void> {
-		console.log("\n=== Task Manager ===");
-		console.log("1. Add Task");
-		console.log("2. View/Filter Tasks");
-		console.log("3. Mark Task as Complete");
-		console.log("4. Remove Task");
-		console.log("5. Exit");
+		await this.displayTableAndMenu();
+	}
 
-		const choice = await this.question("Enter your choice (1-5): ");
+	/**
+	 * Displays the view options menu.
+	 */
+	async showViewOptions(): Promise<void> {
+		await this.displayTableAndMenu(this.lastDisplayedTasks, "Filter/Sort Options", this.viewMenuItems);
+	}
 
-		switch (choice) {
-			case "1":
-				await this.addTask();
-				break;
-			case "2":
-				await this.showViewOptions();
-				break;
-			case "3":
-				await this.markTaskComplete();
-				break;
-			case "4":
-				await this.removeTask();
-				break;
-			case "5":
-				console.log("Goodbye!");
-				this.rl.close();
-				process.exit(0);
-			default:
-				console.log("Invalid choice!");
-				this.showMainMenu();
+	/**
+	 * Displays all tasks.
+	 */
+	private async displayTasks(): Promise<void> {
+		try {
+			const tasks = await this.taskService.getAllTasks();
+			if (tasks.length === 0) {
+				this.lastDisplayedTasks = null;
+				console.log("\nNo tasks found!");
+			} else {
+				await this.displayTableAndMenu(tasks);
+				return;
+			}
+		} catch (error) {
+			console.error("Error displaying tasks:", error);
 		}
+		await this.showMainMenu();
+	}
+
+	/**
+	 * Filters tasks by priority.
+	 */
+	private async filterByPriority(): Promise<void> {
+		try {
+			const { priority } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "priority",
+					message: "Select Priority:",
+					choices: Object.values(Priority).map((p) => ({
+						name: p,
+						value: p,
+					})),
+				},
+			]);
+
+			const tasks = await this.taskService.getTasksByPriority(priority);
+			const filterMessage = tasks.length === 0 ? `No tasks found with priority: ${priority}` : undefined;
+			await this.displayTableAndMenu(tasks, "Filter/Sort Options", this.viewMenuItems, filterMessage);
+		} catch (error) {
+			console.error("Error filtering tasks:", error);
+			await this.showViewOptions();
+		}
+	}
+
+	/**
+	 * Filters tasks by category.
+	 */
+	private async filterByCategory(): Promise<void> {
+		try {
+			const categories = await this.taskService.getUniqueCategories();
+
+			if (categories.length === 0) {
+				await this.displayTableAndMenu([], "Filter/Sort Options", this.viewMenuItems, "No categories found!");
+				return;
+			}
+
+			const { category } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "category",
+					message: "Select Category:",
+					choices: categories.map((c) => ({
+						name: c,
+						value: c,
+					})),
+				},
+			]);
+
+			const tasks = await this.taskService.getTasksByCategory(category);
+			const filterMessage = tasks.length === 0 ? `No tasks found in category: ${category}` : undefined;
+			await this.displayTableAndMenu(tasks, "Filter/Sort Options", this.viewMenuItems, filterMessage);
+		} catch (error) {
+			console.error("Error filtering tasks:", error);
+			await this.showViewOptions();
+		}
+	}
+
+	/**
+	 * Sorts tasks by due date.
+	 */
+	private async sortByDueDate(): Promise<void> {
+		try {
+			const { order } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "order",
+					message: "Select Sort Order:",
+					choices: [
+						{ name: "Earlier → Later", value: true },
+						{ name: "Later → Earlier", value: false },
+					],
+				},
+			]);
+
+			const tasks = await this.taskService.getTasksSortedByDueDate(order);
+			const filterMessage = tasks.length === 0 ? "No tasks found!" : undefined;
+			await this.displayTableAndMenu(tasks, "Filter/Sort Options", this.viewMenuItems, filterMessage);
+		} catch (error) {
+			console.error("Error sorting tasks:", error);
+			await this.showViewOptions();
+		}
+	}
+
+	/**
+	 * Marks a task as complete.
+	 */
+	private async markTaskComplete(): Promise<void> {
+		try {
+			const tasks = await this.taskService.getAllTasks();
+
+			if (tasks.length === 0) {
+				console.log("\nNo tasks available!");
+				await this.showMainMenu();
+				return;
+			}
+
+			const { taskId } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "taskId",
+					message: "Select task to mark as complete:",
+					choices: tasks
+						.filter((task) => !task.isCompleted)
+						.map((task) => ({
+							name: `${task.name} (${task.priority}, Due: ${task.dueDate.toLocaleDateString()})`,
+							value: task.id,
+						})),
+				},
+			]);
+
+			const success = await this.taskService.markTaskAsComplete(taskId);
+			if (success) {
+				console.log("Task marked as complete!");
+			} else {
+				console.log("Failed to mark task as complete.");
+			}
+		} catch (error) {
+			console.error("Error marking task as complete:", error);
+		}
+		await this.showMainMenu();
+	}
+
+	/**
+	 * Removes a task.
+	 */
+	private async removeTask(): Promise<void> {
+		try {
+			const tasks = await this.taskService.getAllTasks();
+
+			if (tasks.length === 0) {
+				console.log("\nNo tasks available!");
+				await this.showMainMenu();
+				return;
+			}
+
+			const { taskId } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "taskId",
+					message: "Select task to remove:",
+					choices: tasks.map((task) => ({
+						name: `${task.name} (${task.priority}, Due: ${task.dueDate.toLocaleDateString()})`,
+						value: task.id,
+					})),
+				},
+			]);
+
+			const success = await this.taskService.removeTask(taskId);
+			if (success) {
+				console.log("Task removed successfully!");
+			} else {
+				console.log("Failed to remove task.");
+			}
+		} catch (error) {
+			console.error("Error removing task:", error);
+		}
+		await this.showMainMenu();
+	}
+
+	/**
+	 * Exits the application.
+	 */
+	private async exit(): Promise<void> {
+		process.exit(0);
 	}
 }
