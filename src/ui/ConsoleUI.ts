@@ -51,6 +51,7 @@ export class ConsoleUI {
 		this.mainMenuItems = [
 			{ name: "📝 Add Task", value: "add", handler: this.addTask.bind(this) },
 			{ name: "👀 View All Tasks", value: "viewAll", handler: this.displayTasks.bind(this) },
+			{ name: "🔍 Search Tasks", value: "search", handler: this.searchTasks.bind(this) },
 			{ name: "🔍 Filter/Sort Tasks", value: "filter", handler: this.showViewOptions.bind(this) },
 			{ name: "✍🏼 Edit Task", value: "edit", handler: this.editTask.bind(this) },
 			{ name: "✅ Mark Task as Complete", value: "complete", handler: this.markTaskComplete.bind(this) },
@@ -156,6 +157,8 @@ export class ConsoleUI {
 						name: item.name,
 						value: item.value,
 					})),
+					loop: false,
+					pageSize: 10,
 				},
 			]);
 
@@ -601,6 +604,79 @@ export class ConsoleUI {
 			await this.displayTableAndMenu(updatedTasks, undefined, undefined, undefined, true);
 		} catch (error) {
 			console.error("Error editing task:", error);
+			await this.showMainMenu();
+		}
+	}
+
+	/**
+	 * Searches for tasks.
+	 */
+	private async searchTasks(): Promise<void> {
+		try {
+			const allTasks = await this.taskService.getAllTasks();
+			if (allTasks.length === 0) {
+				console.log("\nNo tasks available to search!");
+				await this.showMainMenu();
+				return;
+			}
+
+			clearScreen();
+			console.log("\nSearch Tasks (press Ctrl+C to return to main menu)");
+			console.log("Type to search by task name...\n");
+
+			// Display all tasks initially
+			this.formatTasksToTable(allTasks);
+
+			// Setup readline interface for continuous input
+			const rl = require("readline").createInterface({
+				input: process.stdin,
+				output: process.stdout,
+			});
+
+			let searchTerm = "";
+			process.stdin.on("keypress", async (str, key) => {
+				if (key.ctrl && key.name === "c") {
+					rl.close();
+					await this.showMainMenu();
+					return;
+				}
+
+				// Update search term and filter tasks
+				if (key.name === "backspace") {
+					searchTerm = searchTerm.slice(0, -1);
+				} else if (key.sequence) {
+					searchTerm += key.sequence;
+				}
+
+				// Clear screen and show current search
+				clearScreen();
+				console.log("\nSearch Tasks (press Ctrl+C to return to main menu)");
+				console.log(`Current search: ${searchTerm}\n`);
+
+				// Filter and display tasks
+				const filteredTasks = allTasks.filter((task) =>
+					task.name.toLowerCase().includes(searchTerm.toLowerCase())
+				);
+
+				if (filteredTasks.length > 0) {
+					this.formatTasksToTable(filteredTasks);
+				} else {
+					console.log("No matching tasks found.");
+				}
+			});
+
+			// Enable raw mode to capture keypress events
+			process.stdin.setRawMode(true);
+			process.stdin.resume();
+
+			// Wait for readline to close
+			await new Promise((resolve) => rl.on("close", resolve));
+
+			// Cleanup
+			process.stdin.setRawMode(false);
+			process.stdin.removeAllListeners("keypress");
+		} catch (error) {
+			console.error("Error searching tasks:", error);
 			await this.showMainMenu();
 		}
 	}
