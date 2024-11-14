@@ -95,4 +95,28 @@ export class TaskService {
 	async getUniqueCategories(): Promise<string[]> {
 		return await this.taskRepository.getUniqueCategories();
 	}
+
+	/**
+	 * Updates a task.
+	 * @param taskId - The ID of the task to update.
+	 * @param updates - The updates to apply to the task.
+	 * @returns A promise that resolves to the updated task.
+	 */
+	async updateTask(taskId: string, updates: Partial<Task>): Promise<Task | null> {
+		const task = await this.taskRepository.findById(taskId);
+		if (task) {
+			Object.assign(task, updates);
+			return await this.taskRepository.update(task);
+		}
+		return null;
+	}
+
+	/**
+	 * Gets a task by ID.
+	 * @param taskId - The ID of the task to retrieve.
+	 * @returns A promise that resolves to the task or null if not found.
+	 */
+	async getTaskById(taskId: string): Promise<Task | null> {
+		return await this.taskRepository.findById(taskId);
+	}
 }
