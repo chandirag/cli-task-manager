@@ -21,6 +21,11 @@ A TypeScript-based command-line application for managing daily tasks efficiently
 -   Mark tasks as complete
 -   Remove tasks
 
+### Assumptions
+
+- All features of the task manager should be displayed using the terminal.
+- Local data persistence is sufficient
+
 <br>
 
 ## Extended Capabilities
@@ -60,7 +65,7 @@ Beyond the core requirements, the application offers:
 
 ## Getting Started
 
-1. Install a recent version of NodeJS using a preffered method or using nvm.
+1. Install a recent version of NodeJS using a preffered method / using nvm.
 
 2. Clone repository
 
