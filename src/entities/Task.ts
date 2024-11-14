@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from "typeorm";
 import { Priority } from "../types/types";
 
 /**
@@ -26,6 +26,12 @@ export class Task {
 
 	@Column()
 	isCompleted!: boolean;
+
+	@CreateDateColumn()
+	createdAt!: Date;
+
+	@UpdateDateColumn()
+	updatedAt!: Date;
 
 	/**
 	 * Creates an instance of Task.
