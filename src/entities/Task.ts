@@ -1,6 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
 import { Priority } from "../types/types";
 
+/**
+ * Entity representing a task.
+ */
 @Entity()
 export class Task {
 	@PrimaryGeneratedColumn("uuid")
@@ -24,6 +27,13 @@ export class Task {
 	@Column()
 	isCompleted!: boolean;
 
+	/**
+	 * Creates an instance of Task.
+	 * @param name - The name of the task.
+	 * @param priority - The priority of the task.
+	 * @param category - The category of the task.
+	 * @param dueDate - The due date of the task.
+	 */
 	constructor(name: string, priority: Priority, category: string, dueDate: Date) {
 		this.name = name;
 		this.priority = priority;

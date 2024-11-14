@@ -4,10 +4,18 @@ import { Priority } from "../types/types";
 import { Task } from "../entities/Task";
 import Table from "cli-table";
 
+/**
+ * Class representing the console user interface for the task manager.
+ */
 export class ConsoleUI {
 	private rl: readline.Interface;
 	private taskService: TaskService;
+	private static MAX_RETRIES = 3;
 
+	/**
+	 * Creates an instance of ConsoleUI.
+	 * @param taskService - The service for managing tasks.
+	 */
 	constructor(taskService: TaskService) {
 		this.taskService = taskService;
 		this.rl = readline.createInterface({
@@ -16,20 +24,219 @@ export class ConsoleUI {
 		});
 	}
 
+	/**
+	 * Prompts the user with a question and returns their input.
+	 * @param query - The question to ask the user.
+	 * @returns A promise that resolves to the user's input.
+	 */
 	private async question(query: string): Promise<string> {
 		return new Promise((resolve) => {
 			this.rl.question(query, resolve);
 		});
 	}
 
+	/**
+	 * Prompts the user with a question and validates the input with retries.
+	 * @param query - The question to ask the user.
+	 * @param validator - The function to validate the user's input.
+	 * @param currentRetry - The current retry attempt.
+	 * @returns A promise that resolves to the valid input or null if max retries are exceeded.
+	 */
+	private async questionWithRetries(
+		query: string,
+		validator: (input: string) => { isValid: boolean; message?: string },
+		currentRetry: number = 1
+	): Promise<string | null> {
+		const answer = await this.question(query);
+		const validation = validator(answer);
+
+		if (validation.isValid) {
+			return answer;
+		}
+
+		if (currentRetry >= ConsoleUI.MAX_RETRIES) {
+			console.log("\nToo many invalid attempts. Returning to main menu.");
+			return null;
+		}
+
+		console.log(validation.message || "Invalid input. Please try again.");
+		return this.questionWithRetries(query, validator, currentRetry + 1);
+	}
+
+	/**
+	 * Validates the priority input.
+	 * @param input - The user's input.
+	 * @returns An object indicating if the input is valid and an optional message.
+	 */
+	private validatePriority(input: string): { isValid: boolean; message?: string } {
+		const normalizedInput = input.toLowerCase();
+		const validInputs = {
+			low: Priority.LOW,
+			l: Priority.LOW,
+			medium: Priority.MEDIUM,
+			m: Priority.MEDIUM,
+			high: Priority.HIGH,
+			h: Priority.HIGH,
+		};
+
+		if (normalizedInput in validInputs) {
+			return { isValid: true };
+		}
+
+		return {
+			isValid: false,
+			message: "Please enter a valid priority (Low/L, Medium/M, High/H)",
+		};
+	}
+
+	/**
+	 * Validates the due date input.
+	 * @param input - The user's input.
+	 * @returns An object indicating if the input is valid and an optional message.
+	 */
+	private validateDueDate(input: string): { isValid: boolean; message?: string } {
+		// Check format
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+			return {
+				isValid: false,
+				message: "Please enter the date in YYYY-MM-DD format",
+			};
+		}
+
+		const inputDate = new Date(input);
+
+		// Check if date is valid
+		if (isNaN(inputDate.getTime())) {
+			return {
+				isValid: false,
+				message: "Please enter a valid date",
+			};
+		}
+
+		// Remove time component for comparison
+		const today = new Date();
+		const todayWithoutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+		const inputWithoutTime = new Date(inputDate.getFullYear(), inputDate.getMonth(), inputDate.getDate());
+
+		// Check if date is in the past
+		if (inputWithoutTime < todayWithoutTime) {
+			return {
+				isValid: false,
+				message: "Due date cannot be in the past",
+			};
+		}
+
+		// Validate month and day
+		const [year, month, day] = input.split("-").map(Number);
+		const monthDays = new Date(year, month, 0).getDate();
+
+		if (month < 1 || month > 12) {
+			return {
+				isValid: false,
+				message: "Month must be between 1 and 12",
+			};
+		}
+
+		if (day < 1 || day > monthDays) {
+			return {
+				isValid: false,
+				message: `Day must be between 1 and ${monthDays} for the selected month`,
+			};
+		}
+
+		return { isValid: true };
+	}
+
+	/**
+	 * Validates the task name input.
+	 * @param input - The user's input.
+	 * @returns An object indicating if the input is valid and an optional message.
+	 */
+	private validateTaskName(input: string): { isValid: boolean; message?: string } {
+		if (input.trim().length === 0) {
+			return {
+				isValid: false,
+				message: "Task name cannot be empty",
+			};
+		}
+		return { isValid: true };
+	}
+
+	/**
+	 * Validates the category input.
+	 * @param input - The user's input.
+	 * @returns An object indicating if the input is valid and an optional message.
+	 */
+	private validateCategory(input: string): { isValid: boolean; message?: string } {
+		if (input.trim().length === 0) {
+			return {
+				isValid: false,
+				message: "Category cannot be empty",
+			};
+		}
+		return { isValid: true };
+	}
+
+	/**
+	 * Converts user input to a Priority enum.
+	 * @param input - The user's input.
+	 * @returns The corresponding Priority enum.
+	 */
+	private getPriorityFromInput(input: string): Priority {
+		const normalizedInput = input.toLowerCase();
+		switch (normalizedInput) {
+			case "l":
+			case "low":
+				return Priority.LOW;
+			case "m":
+			case "medium":
+				return Priority.MEDIUM;
+			case "h":
+			case "high":
+				return Priority.HIGH;
+			default:
+				throw new Error("Invalid priority");
+		}
+	}
+
+	/**
+	 * Prompts the user to add a new task with validation.
+	 */
 	async addTask(): Promise<void> {
-		const name = await this.question("Enter task name: ");
-		const priority = await this.question("Enter priority (Low/Medium/High): ");
-		const category = await this.question("Enter category: ");
-		const dueDateStr = await this.question("Enter due date (YYYY-MM-DD): ");
+		// Get task name
+		const name = await this.questionWithRetries("Enter task name: ", this.validateTaskName);
+		if (!name) {
+			this.showMainMenu();
+			return;
+		}
+
+		// Get priority
+		const priorityInput = await this.questionWithRetries(
+			"Enter priority (Low/L, Medium/M, High/H): ",
+			this.validatePriority
+		);
+		if (!priorityInput) {
+			this.showMainMenu();
+			return;
+		}
+
+		// Get category
+		const category = await this.questionWithRetries("Enter category: ", this.validateCategory);
+		if (!category) {
+			this.showMainMenu();
+			return;
+		}
+
+		// Get due date
+		const dueDateStr = await this.questionWithRetries("Enter due date (YYYY-MM-DD): ", this.validateDueDate);
+		if (!dueDateStr) {
+			this.showMainMenu();
+			return;
+		}
 
 		try {
-			await this.taskService.addTask(name, priority as Priority, category, new Date(dueDateStr));
+			const priority = this.getPriorityFromInput(priorityInput);
+			await this.taskService.addTask(name, priority, category, new Date(dueDateStr));
 			console.log("Task added successfully!");
 		} catch (error) {
 			console.error("Error adding task:", error);
@@ -37,6 +244,10 @@ export class ConsoleUI {
 		this.showMainMenu();
 	}
 
+	/**
+	 * Creates a table for displaying tasks.
+	 * @returns A new Table instance.
+	 */
 	private createTaskTable(): Table {
 		return new Table({
 			head: ["#", "ID", "Name", "Priority", "Category", "Due Date", "Status"],
@@ -48,6 +259,10 @@ export class ConsoleUI {
 		});
 	}
 
+	/**
+	 * Formats tasks into a table and displays it.
+	 * @param tasks - The list of tasks to display.
+	 */
 	private formatTasksToTable(tasks: Task[]): void {
 		const table = this.createTaskTable();
 
@@ -66,6 +281,9 @@ export class ConsoleUI {
 		console.log(table.toString());
 	}
 
+	/**
+	 * Displays all tasks in a table format.
+	 */
 	async displayTasks(): Promise<void> {
 		try {
 			const tasks = await this.taskService.getAllTasks();
@@ -81,6 +299,9 @@ export class ConsoleUI {
 		this.showMainMenu();
 	}
 
+	/**
+	 * Marks a task as complete based on user input.
+	 */
 	async markTaskComplete(): Promise<void> {
 		const taskId = await this.question("Enter task ID to mark as complete: ");
 		const success = await this.taskService.markTaskAsComplete(taskId);
@@ -93,6 +314,9 @@ export class ConsoleUI {
 		this.showMainMenu();
 	}
 
+	/**
+	 * Removes a task based on user input.
+	 */
 	async removeTask(): Promise<void> {
 		const taskId = await this.question("Enter task ID to remove: ");
 		const success = await this.taskService.removeTask(taskId);
@@ -105,6 +329,10 @@ export class ConsoleUI {
 		this.showMainMenu();
 	}
 
+	/**
+	 * Displays filtered tasks in a table format.
+	 * @param tasks - The list of tasks to display.
+	 */
 	private async displayFilteredTasks(tasks: Task[]): Promise<void> {
 		if (tasks.length === 0) {
 			console.log("\nNo tasks found!");
@@ -114,6 +342,9 @@ export class ConsoleUI {
 		this.formatTasksToTable(tasks);
 	}
 
+	/**
+	 * Filters tasks by priority based on user input.
+	 */
 	async filterByPriority(): Promise<void> {
 		console.log("\nSelect Priority:");
 		console.log(`1. ${Priority.LOW}`);
@@ -144,6 +375,9 @@ export class ConsoleUI {
 		this.showMainMenu();
 	}
 
+	/**
+	 * Filters tasks by category based on user input.
+	 */
 	async filterByCategory(): Promise<void> {
 		const categories = await this.taskService.getUniqueCategories();
 
@@ -170,6 +404,9 @@ export class ConsoleUI {
 		this.showMainMenu();
 	}
 
+	/**
+	 * Sorts tasks by due date based on user input.
+	 */
 	async sortByDueDate(): Promise<void> {
 		console.log("\nSort Order:");
 		console.log("1. Ascending (Earlier → Later)");
@@ -183,6 +420,9 @@ export class ConsoleUI {
 		this.showMainMenu();
 	}
 
+	/**
+	 * Displays the view options menu.
+	 */
 	async showViewOptions(): Promise<void> {
 		console.log("\n=== View Options ===");
 		console.log("1. View All Tasks");
@@ -215,6 +455,9 @@ export class ConsoleUI {
 		}
 	}
 
+	/**
+	 * Displays the main menu and handles user input.
+	 */
 	async showMainMenu(): Promise<void> {
 		console.log("\n=== Task Manager ===");
 		console.log("1. Add Task");
