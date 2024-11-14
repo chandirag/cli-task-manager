@@ -64,11 +64,21 @@ export class MenuHandler extends BaseUI {
 				handler: this.filterHandler.handleFilterByCategory.bind(this.filterHandler),
 			},
 			{
+				name: "✅ Filter by Completion",
+				value: "completion",
+				handler: this.filterHandler.handleFilterByCompletion.bind(this.filterHandler),
+			},
+			{
+				name: "📅 Filter by Due Date",
+				value: "dueDate",
+				handler: this.filterHandler.handleFilterByDueDate.bind(this.filterHandler),
+			},
+			{
 				name: "📅 Sort by Due Date",
-				value: "date",
+				value: "sort",
 				handler: this.filterHandler.handleSortByDueDate.bind(this.filterHandler),
 			},
-			{ name: "⏪  Back to Main Menu", value: "back", handler: this.showMainMenu.bind(this) },
+			{ name: "⏪ Back to Main Menu", value: "back", handler: this.showMainMenu.bind(this) },
 		];
 	}
 

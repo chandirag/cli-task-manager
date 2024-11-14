@@ -130,4 +130,91 @@ export class FilterHandler extends BaseUI {
 			console.error("Error sorting tasks:", error);
 		}
 	}
+
+	/**
+	 * Handles filtering tasks by completion status.
+	 * Shows tasks based on their completion state.
+	 */
+	public async handleFilterByCompletion(): Promise<void> {
+		try {
+			const { status } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "status",
+					message: "Select Status:",
+					choices: [
+						{ name: "Completed Tasks", value: true },
+						{ name: "Pending Tasks", value: false },
+					],
+				},
+			]);
+
+			const tasks = await this.taskService.getTasksByCompletion(status);
+			if (tasks.length === 0) {
+				console.log(`\nNo ${status ? "completed" : "pending"} tasks found`);
+				return;
+			}
+
+			clearScreen();
+			console.log(`\nShowing ${status ? "completed" : "pending"} tasks\n`);
+			this.tableComponent.formatTasksToTable(tasks);
+		} catch (error) {
+			if (this.isUserInterruptionError(error)) {
+				return;
+			}
+			console.error("Error filtering tasks:", error);
+		}
+	}
+
+	/**
+	 * Handles filtering tasks by due date ranges.
+	 * Provides quick options for common time periods.
+	 */
+	public async handleFilterByDueDate(): Promise<void> {
+		try {
+			const { period } = await inquirer.prompt([
+				{
+					type: "list",
+					name: "period",
+					message: "Select time period:",
+					choices: [
+						{ name: "Due Today", value: "today" },
+						{ name: "Due This Week", value: "week" },
+						{ name: "Due This Month", value: "month" },
+					],
+				},
+			]);
+
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			let endDate = new Date(today);
+			switch (period) {
+				case "today":
+					endDate.setDate(today.getDate() + 1);
+					break;
+				case "week":
+					endDate.setDate(today.getDate() + 7);
+					break;
+				case "month":
+					endDate.setMonth(today.getMonth() + 1);
+					break;
+			}
+
+			const tasks = await this.taskService.getTasksByDueDateRange(today, endDate);
+			if (tasks.length === 0) {
+				console.log(`\nNo tasks found due ${period}`);
+				return;
+			}
+
+			clearScreen();
+			console.log(`\nShowing tasks due ${period}\n`);
+			this.tableComponent.formatTasksToTable(tasks);
+		} catch (error) {
+			if (this.isUserInterruptionError(error)) {
+				return;
+			}
+			console.error("Error filtering tasks:", error);
+		}
+	}
 }

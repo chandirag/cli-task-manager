@@ -80,12 +80,17 @@ export class TaskHandler extends BaseUI {
 					type: "list",
 					name: "taskId",
 					message: "Select task to edit:",
-					choices: tasks.map((task) => ({
-						name: `${task.name} (${task.priority}, Due: ${task.dueDate.toLocaleDateString()})`,
-						value: task.id,
-					})),
+					choices: [
+						...tasks.map((task) => ({
+							name: `${task.name} (${task.priority}, Due: ${task.dueDate.toLocaleDateString()})`,
+							value: task.id,
+						})),
+						{ name: "⏪ Back to Main Menu", value: "back" },
+					],
 				},
 			]);
+
+			if (taskId === "back") return;
 
 			const task = await this.taskService.getTaskById(taskId);
 			if (!task) {
@@ -103,9 +108,13 @@ export class TaskHandler extends BaseUI {
 						{ name: "⭐ Priority", value: "priority" },
 						{ name: "🏷️  Category", value: "category" },
 						{ name: "📅 Due Date", value: "dueDate" },
+						{ name: "✅ Completion Status", value: "isCompleted" },
+						{ name: "⏪ Back to Main Menu", value: "back" },
 					],
 				},
 			]);
+
+			if (field === "back") return;
 
 			const updates = await this.getFieldUpdates(field, task);
 			await this.taskService.updateTask(taskId, updates);
@@ -136,12 +145,17 @@ export class TaskHandler extends BaseUI {
 					type: "list",
 					name: "taskId",
 					message: "Select task to remove:",
-					choices: tasks.map((task) => ({
-						name: `${task.name} (${task.priority}, Due: ${task.dueDate.toLocaleDateString()})`,
-						value: task.id,
-					})),
+					choices: [
+						...tasks.map((task) => ({
+							name: `${task.name} (${task.priority}, Due: ${task.dueDate.toLocaleDateString()})`,
+							value: task.id,
+						})),
+						{ name: "⏪ Back to Main Menu", value: "back" },
+					],
 				},
 			]);
+
+			if (taskId === "back") return;
 
 			const { confirm } = await inquirer.prompt([
 				{
@@ -226,6 +240,21 @@ export class TaskHandler extends BaseUI {
 					},
 				]);
 				return { dueDate: new Date(dueDate) };
+
+			case "isCompleted":
+				const { isCompleted } = await inquirer.prompt([
+					{
+						type: "list",
+						name: "isCompleted",
+						message: "Select completion status:",
+						choices: [
+							{ name: "Completed", value: true },
+							{ name: "Pending", value: false },
+						],
+						default: task.isCompleted,
+					},
+				]);
+				return { isCompleted };
 
 			default:
 				return {};
