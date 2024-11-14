@@ -1,9 +1,9 @@
-import inquirer from "inquirer";
 import { BaseUI } from "../base/BaseUI";
 import { TaskService } from "../../services/TaskService";
 import { Priority } from "../../types/types";
 import { TableComponent } from "../components/TableComponent";
 import { clearScreen } from "../../utils/console";
+import { select } from "@inquirer/prompts";
 
 /**
  * Handles all filtering and sorting operations for tasks.
@@ -26,17 +26,13 @@ export class FilterHandler extends BaseUI {
 	 */
 	public async handleFilterByPriority(): Promise<void> {
 		try {
-			const { priority } = await inquirer.prompt([
-				{
-					type: "list",
-					name: "priority",
-					message: "Select Priority:",
-					choices: Object.values(Priority).map((p) => ({
-						name: p,
-						value: p,
-					})),
-				},
-			]);
+			const priority = await select({
+				message: "Select Priority:",
+				choices: Object.values(Priority).map((p) => ({
+					name: p,
+					value: p,
+				})),
+			});
 
 			const tasks = await this.taskService.getTasksByPriority(priority);
 			if (tasks.length === 0) {
@@ -67,17 +63,13 @@ export class FilterHandler extends BaseUI {
 				return;
 			}
 
-			const { category } = await inquirer.prompt([
-				{
-					type: "list",
-					name: "category",
-					message: "Select Category:",
-					choices: categories.map((c) => ({
-						name: c,
-						value: c,
-					})),
-				},
-			]);
+			const category = await select({
+				message: "Select Category:",
+				choices: categories.map((c) => ({
+					name: c,
+					value: c,
+				})),
+			});
 
 			const tasks = await this.taskService.getTasksByCategory(category);
 			if (tasks.length === 0) {
@@ -102,17 +94,13 @@ export class FilterHandler extends BaseUI {
 	 */
 	public async handleSortByDueDate(): Promise<void> {
 		try {
-			const { order } = await inquirer.prompt([
-				{
-					type: "list",
-					name: "order",
-					message: "Select Sort Order:",
-					choices: [
-						{ name: "Earlier → Later", value: true },
-						{ name: "Later → Earlier", value: false },
-					],
-				},
-			]);
+			const order = await select({
+				message: "Select Sort Order:",
+				choices: [
+					{ name: "Earlier → Later", value: true },
+					{ name: "Later → Earlier", value: false },
+				],
+			});
 
 			const tasks = await this.taskService.getTasksSortedByDueDate(order);
 			if (tasks.length === 0) {
@@ -137,17 +125,13 @@ export class FilterHandler extends BaseUI {
 	 */
 	public async handleFilterByCompletion(): Promise<void> {
 		try {
-			const { status } = await inquirer.prompt([
-				{
-					type: "list",
-					name: "status",
-					message: "Select Status:",
-					choices: [
-						{ name: "Completed Tasks", value: true },
-						{ name: "Pending Tasks", value: false },
-					],
-				},
-			]);
+			const status = await select({
+				message: "Select Status:",
+				choices: [
+					{ name: "Completed Tasks", value: true },
+					{ name: "Pending Tasks", value: false },
+				],
+			});
 
 			const tasks = await this.taskService.getTasksByCompletion(status);
 			if (tasks.length === 0) {
@@ -172,18 +156,14 @@ export class FilterHandler extends BaseUI {
 	 */
 	public async handleFilterByDueDate(): Promise<void> {
 		try {
-			const { period } = await inquirer.prompt([
-				{
-					type: "list",
-					name: "period",
-					message: "Select time period:",
-					choices: [
-						{ name: "Due Today", value: "today" },
-						{ name: "Due This Week", value: "week" },
-						{ name: "Due This Month", value: "month" },
-					],
-				},
-			]);
+			const period = await select({
+				message: "Select time period:",
+				choices: [
+					{ name: "Due Today", value: "today" },
+					{ name: "Due This Week", value: "week" },
+					{ name: "Due This Month", value: "month" },
+				],
+			});
 
 			const today = new Date();
 			today.setHours(0, 0, 0, 0);

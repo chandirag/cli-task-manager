@@ -57,13 +57,10 @@ export abstract class BaseUI {
 	 * @param error - The error to check
 	 * @returns True if the error is from user interruption
 	 */
-	protected isUserInterruptionError(error: unknown): error is { message: string } {
+	protected isUserInterruptionError(error: unknown): boolean {
 		return (
-			typeof error === "object" &&
-			error !== null &&
-			"message" in error &&
-			typeof (error as { message: string }).message === "string" &&
-			(error as { message: string }).message.includes("User force closed the prompt")
+			error instanceof Error &&
+			(error.message.includes("User force closed the prompt") || error.message.includes("Prompt was canceled"))
 		);
 	}
 }

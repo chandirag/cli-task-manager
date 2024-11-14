@@ -1,18 +1,25 @@
-import inquirer from "inquirer";
 import { TaskService } from "../services/TaskService";
-import { IMenuItem } from "../types/types";
 import { BaseUI } from "./base/BaseUI";
 import { SearchHandler } from "./handlers/SearchHandler";
 import { TaskHandler } from "./handlers/TaskHandler";
 import { FilterHandler } from "./handlers/FilterHandler";
 import { MenuHandler } from "./handlers/MenuHandler";
 
+/**
+ * Main UI class that orchestrates the console interface.
+ * Initializes and manages different handlers for various functionalities.
+ */
 export class ConsoleUI extends BaseUI {
 	private readonly searchHandler: SearchHandler;
 	private readonly taskHandler: TaskHandler;
 	private readonly filterHandler: FilterHandler;
 	private readonly menuHandler: MenuHandler;
 
+	/**
+	 * Creates an instance of ConsoleUI.
+	 * Initializes all handlers and sets up the Ctrl+C handler.
+	 * @param taskService - The service for managing tasks
+	 */
 	constructor(taskService: TaskService) {
 		super(taskService);
 
@@ -28,6 +35,9 @@ export class ConsoleUI extends BaseUI {
 		});
 	}
 
+	/**
+	 * Starts the application by showing the main menu.
+	 */
 	public async start(): Promise<void> {
 		await this.menuHandler.showMainMenu();
 	}

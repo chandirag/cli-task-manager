@@ -1,4 +1,3 @@
-import inquirer from "inquirer";
 import { BaseUI } from "../base/BaseUI";
 import { TaskService } from "../../services/TaskService";
 import { IMenuItem } from "../../types/types";
@@ -7,6 +6,7 @@ import { SearchHandler } from "./SearchHandler";
 import { TaskHandler } from "./TaskHandler";
 import { FilterHandler } from "./FilterHandler";
 import { clearScreen } from "../../utils/console";
+import { select, confirm } from "@inquirer/prompts";
 
 /**
  * Handles all menu-related operations in the application.
@@ -91,19 +91,15 @@ export class MenuHandler extends BaseUI {
 	 */
 	private async displayMenu(title: string, menuItems: IMenuItem[], isSubMenu: boolean = false): Promise<void> {
 		try {
-			const { action } = await inquirer.prompt([
-				{
-					type: "list",
-					name: "action",
-					message: title,
-					choices: menuItems.map((item) => ({
-						name: item.name,
-						value: item.value,
-					})),
-					loop: false,
-					pageSize: 10,
-				},
-			]);
+			const action = await select({
+				message: title,
+				choices: menuItems.map((item) => ({
+					name: item.name,
+					value: item.value,
+				})),
+				loop: false,
+				pageSize: 10,
+			});
 
 			const menuItem = menuItems.find((item) => item.value === action);
 			if (menuItem) {
@@ -189,20 +185,21 @@ export class MenuHandler extends BaseUI {
 				return;
 			}
 
-			const { taskId } = await inquirer.prompt([
-				{
-					type: "list",
-					name: "taskId",
-					message: "Select task to mark as complete:",
-					choices: incompleteTasks.map((task) => ({
-						name: `${task.name} (${task.priority}, Due: ${task.dueDate.toLocaleDateString()})`,
-						value: task.id,
-					})),
-				},
-			]);
+			const taskId = await select({
+				message: "Select task to mark as complete:",
+				choices: incompleteTasks.map((task) => ({
+					name: `${task.name} (${task.priority}, Due: ${task.dueDate.toLocaleDateString()})`,
+					value: task.id,
+				})),
+			});
 
 			await this.taskService.markTaskAsComplete(taskId);
-			console.log("Task marked as complete!");
+			clearScreen();
+			console.log("✅ Task marked as complete!\n");
+
+			// Show updated table
+			const updatedTasks = await this.taskService.getAllTasks();
+			this.tableComponent.formatTasksToTable(updatedTasks);
 		} catch (error) {
 			if (this.isUserInterruptionError(error)) {
 				return;
@@ -216,16 +213,12 @@ export class MenuHandler extends BaseUI {
 	 * Prompts for confirmation before exiting.
 	 */
 	private async handleExit(): Promise<void> {
-		const { confirm } = await inquirer.prompt([
-			{
-				type: "confirm",
-				name: "confirm",
-				message: "Are you sure you want to exit?",
-				default: false,
-			},
-		]);
+		const shouldExit = await confirm({
+			message: "Are you sure you want to exit?",
+			default: false,
+		});
 
-		if (confirm) {
+		if (shouldExit) {
 			console.log("👋 Goodbye! Your tasks will be here when you come back!");
 			process.exit(0);
 		}

@@ -9,7 +9,6 @@ async function main() {
 	try {
 		await AppDataSource.initialize();
 		clearScreen();
-		console.log("Database connection established");
 
 		const taskRepository = new TaskRepository();
 		const taskService = new TaskService(taskRepository);
