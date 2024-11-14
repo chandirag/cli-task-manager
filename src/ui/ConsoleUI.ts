@@ -534,7 +534,7 @@ export class ConsoleUI {
 					name: "field",
 					message: "What would you like to edit?",
 					choices: [
-						{ name: "📝 Task Name", value: "name" },
+						{ name: "��� Task Name", value: "name" },
 						{ name: "⭐ Priority", value: "priority" },
 						{ name: "🏷️  Category", value: "category" },
 						{ name: "📅 Due Date", value: "dueDate" },
@@ -622,7 +622,7 @@ export class ConsoleUI {
 
 			clearScreen();
 			console.log("\nSearch Tasks (press Ctrl+C to return to main menu)");
-			console.log("Type to search by task name...\n");
+			console.log("Type to search across task name, category, or status...\n");
 
 			// Display all tasks initially
 			this.formatTasksToTable(allTasks);
@@ -635,16 +635,33 @@ export class ConsoleUI {
 
 			let searchTerm = "";
 			process.stdin.on("keypress", async (str, key) => {
+				// Handle Ctrl+C to exit
 				if (key.ctrl && key.name === "c") {
 					rl.close();
 					await this.showMainMenu();
 					return;
 				}
 
-				// Update search term and filter tasks
+				// Ignore arrow keys and other special keys
+				if (
+					key.name === "up" ||
+					key.name === "down" ||
+					key.name === "left" ||
+					key.name === "right" ||
+					key.name === "home" ||
+					key.name === "end" ||
+					key.name === "pageup" ||
+					key.name === "pagedown"
+				) {
+					return;
+				}
+
+				// Handle backspace
 				if (key.name === "backspace") {
 					searchTerm = searchTerm.slice(0, -1);
-				} else if (key.sequence) {
+				}
+				// Only add alphanumeric characters and spaces
+				else if (key.sequence && /^[a-zA-Z0-9 ]$/.test(key.sequence)) {
 					searchTerm += key.sequence;
 				}
 
@@ -653,13 +670,23 @@ export class ConsoleUI {
 				console.log("\nSearch Tasks (press Ctrl+C to return to main menu)");
 				console.log(`Current search: ${searchTerm}\n`);
 
-				// Filter and display tasks
-				const filteredTasks = allTasks.filter((task) =>
-					task.name.toLowerCase().includes(searchTerm.toLowerCase())
-				);
+				// Filter tasks across multiple fields
+				const filteredTasks = allTasks.filter((task) => {
+					const searchTermLower = searchTerm.toLowerCase();
+					return (
+						// Search in task name
+						task.name.toLowerCase().includes(searchTermLower) ||
+						// Search in category
+						task.category.toLowerCase().includes(searchTermLower) ||
+						// Search in completion status
+						(task.isCompleted ? "completed" : "pending").includes(searchTermLower)
+					);
+				});
 
 				if (filteredTasks.length > 0) {
 					this.formatTasksToTable(filteredTasks);
+					// Show search match statistics
+					console.log(`\nFound ${filteredTasks.length} matching tasks out of ${allTasks.length} total tasks`);
 				} else {
 					console.log("No matching tasks found.");
 				}
@@ -667,7 +694,6 @@ export class ConsoleUI {
 
 			// Enable raw mode to capture keypress events
 			process.stdin.setRawMode(true);
-			process.stdin.resume();
 
 			// Wait for readline to close
 			await new Promise((resolve) => rl.on("close", resolve));
